@@ -1,3 +1,55 @@
 on:
   schedule:
   - cron: "0 22 * * 1-5"
+
+  
+jobs:
+  create_pull_request:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Create Branch and Make Changes
+        run: |
+          git checkout -b feature-branch
+          echo "Hello, World!" > example.txt
+          git add example.txt
+          git commit -m "Add new feature"
+          git push origin feature-branch
+
+      - name: Create Pull Request
+        run: |
+          TOKEN=$GITHUB_TOKEN
+          USERNAME=$GITHUB_ACTOR
+          REPO=$GITHUB_REPOSITORY
+          BASE_BRANCH=main
+          FEATURE_BRANCH=main
+          
+          pr_response=$(curl -X POST -H "Authorization: token $TOKEN" \
+            -d '{"title":"Automated Pull Request","head":"'$FEATURE_BRANCH'", "base":"'$BASE_BRANCH'"}' \
+            "https://api.github.com/repos/$USERNAME/$REPO/pulls")
+          
+          pr_number=$(echo $pr_response | jq -r '.number')
+
+      - name: Approve Pull Request
+        run: |
+          TOKEN=$GITHUB_TOKEN
+          USERNAME=$GITHUB_ACTOR
+          REPO=$GITHUB_REPOSITORY
+          PR_NUMBER=$pr_number
+          
+          curl -X POST -H "Authorization: token $TOKEN" \
+            -d '{"event":"APPROVE"}' \
+            "https://api.github.com/repos/$USERNAME/$REPO/pulls/$PR_NUMBER/reviews"
+
+      - name: Merge Pull Request
+        run: |
+          TOKEN=$GITHUB_TOKEN
+          USERNAME=$GITHUB_ACTOR
+          REPO=$GITHUB_REPOSITORY
+          PR_NUMBER=$pr_number
+          
+          curl -X PUT -H "Authorization: token $TOKEN" \
+            "https://api.github.com/repos/$USERNAME/$REPO/pulls/$PR_NUMBER/merge"
